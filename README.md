@@ -109,14 +109,32 @@ in [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-co
 ```text
 Read specs/azure-deployment-requirements.md and deploy this project to Azure.
 Verify my az/azd login, check the gpt-4o-mini quota and resource providers in the target region,
-run azd up to a throwaway resource group, then smoke-test the agentic-ui endpoint and report back.
+run azd up to resource group rg-agentic-blueprint, then run the post-deploy smoke test
+(./infra/scripts/postdeploy-smoke-test.ps1) and report back.
 ```
 
 The agent uses [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) as the prerequisite checklist (RBAC, providers, quota, region, UI auth) and [`Spec2Cloud-about.md`](Spec2Cloud-about.md) 
 for the spec-driven workflow context, so it can diagnose and resolve common provisioning blockers (quota, base-image pull limits) without you stepping 
 through each command.
 
-### Author
+### Verify the deployment
+
+After `azd up`, run the post-deploy smoke test to confirm everything works end to end:
+
+```bash
+./infra/scripts/postdeploy-smoke-test.ps1            # uses the default azd environment
+# or target a specific resource group:
+./infra/scripts/postdeploy-smoke-test.ps1 -ResourceGroup rg-<env>
+```
+
+It auto-discovers the deployment from the resource group and checks: ingress topology (only
+`agentic-ui` is public; the BFF and orchestrator are internal-only), UI reachability, a full
+streaming chat round-trip (browser → UI → BFF → orchestrator), that the internal apps are **not**
+reachable from the internet, and that the Foundry model deployment plus its env vars are wired into
+the orchestrator. It exits non-zero on any failure, so an agent or CI can gate on it. Requires the
+`az` CLI (logged in) and `curl`.
+
+## Author
 
 Henry Bravo - Sr. Solution Engineer Microsoft Cloud & AI
 
