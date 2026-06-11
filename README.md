@@ -1,0 +1,125 @@
+# Agentic Azure Blueprint
+
+**A spec-driven, agentic Azure application shell** - Next.js frontend + FastAPI BFF + LangGraph
+orchestrator, three Azure Container Apps wired by .NET Aspire, deployed with `azd`, and driven by
+the [spec2cloud](https://github.com/EmeaAppGbb/spec2cloud) spec-driven-development (SDD) workflow.
+
+## What's in the box
+
+| Area | What you get |
+|------|--------------|
+| **Services** (`src/`) | `agentic-ui` (Next.js 16), `agentic-api` (FastAPI BFF), `orchestrator` (LangGraph) |
+| **Local orchestration** _(optional)_ | `apphost.cs` - .NET Aspire runs all three + a dashboard; each service also runs standalone (see below) |
+| **Infra** (`infra/`) | Bicep (Azure Verified Modules): Container Apps env, ACR, managed identity, App Insights, AI Foundry model |
+| **Deploy** | `azure.yaml` + `azd up` |
+| **SDD framework** (`.github/`) | spec2cloud agents, prompts, and 40+ skills |
+| **SDD state** (`.spec2cloud/`) | `state.json` (resumable source of truth) + `audit.log` (append-only trail) |
+| **Design docs** (`specs/`) | [LLD: LangGraph agent on Foundry](specs/lld-langgraph-foundry-agent.md), [Azure deployment requirements](specs/azure-deployment-requirements.md) |
+| **Dev env** (`.devcontainer/`) _(optional)_ | Azure CLI, azd, Bicep, .NET + Aspire, Node/TypeScript, Docker-in-Docker, APM CLI |
+
+## Building blocks
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F2FA','primaryTextColor':'#323130','primaryBorderColor':'#0078D4','secondaryColor':'#E6F2FA','secondaryTextColor':'#323130','secondaryBorderColor':'#0078D4','tertiaryColor':'#E6F2FA','tertiaryTextColor':'#323130','tertiaryBorderColor':'#0078D4','clusterBkg':'#E6F2FA','clusterBorder':'#0078D4','titleColor':'#323130','textColor':'#323130','edgeLabelBackground':'#ffffff','lineColor':'#005A9E','fontFamily':'Segoe UI'}}}%%
+flowchart TD
+    User["Developer or end user<br/><i>browser</i>"]
+
+    subgraph Dev["Local dev - .NET Aspire"]
+        APPHOST["apphost.cs<br/><i>runs all services + dashboard</i>"]
+    end
+
+    subgraph ACA["Azure Container Apps"]
+        UI["agentic-ui<br/>Next.js"]
+        BFF["agentic-api<br/>FastAPI BFF"]
+        ORCH["orchestrator<br/>LangGraph"]
+    end
+
+    subgraph Azure["Azure PaaS - infra/ Bicep (AVM)"]
+        AI["AI Foundry<br/><i>model deployment</i>"]
+        ACR["Container Registry"]
+        UAMI["Managed identity"]
+        MON["App Insights<br/>Log Analytics"]
+        COSMOS[("Cosmos DB<br/><i>optional - memory seam</i>")]
+    end
+
+    User -->|HTTPS| UI
+    UI -->|/api/*| BFF
+    BFF -->|SSE /turn| ORCH
+    ORCH -->|managed identity| AI
+    ACR -->|image pull| ACA
+    ORCH -.optional, MI.-> COSMOS
+    UI & BFF & ORCH -.telemetry.-> MON
+    UAMI -.identity.-> ACA
+    APPHOST -.runs locally.-> UI & BFF & ORCH
+
+    classDef userNode fill:#005A9E,stroke:#004578,color:#fff
+    classDef appNode fill:#0078D4,stroke:#004578,color:#fff
+    classDef paasNode fill:#E6F2FA,stroke:#0078D4,color:#323130
+    classDef dataNode fill:#107C10,stroke:#004578,color:#fff
+
+    class User userNode
+    class UI,BFF,ORCH,APPHOST appNode
+    class AI,ACR,UAMI,MON paasNode
+    class COSMOS dataNode
+```
+
+## Prerequisites
+
+- **Azure CLI + `azd`** and an Azure subscription - the only hard requirement to deploy (`azd up`).
+- For local development: Python 3.11+ with [uv](https://docs.astral.sh/uv/) and Node 20+.
+- **Optional conveniences** (neither is required):
+  - The [Dev Container](https://containers.dev/) (`.devcontainer/`) preinstalls everything below.
+    Without it, install the tools yourself locally.
+  - **.NET Aspire** (`apphost.cs`, needs .NET SDK 9) runs all three services + a dashboard with one
+    command. You can skip Aspire entirely and run each service standalone instead (see below).
+
+> **Docker is not required to deploy** - `azure.yaml` sets `remoteBuild: true`, so container images
+> build in ACR. See [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md)
+> for the full subscription/RBAC/quota prerequisites.
+
+## Run it locally
+
+```bash
+# Option A (optional convenience): all three services + Aspire dashboard
+dotnet run apphost.cs
+
+# Option B: run each service standalone (no Aspire / .NET required)
+cd src/agentic-api  && uv run fastapi dev main.py   # http://localhost:8080
+cd src/orchestrator && uv run fastapi dev main.py   # http://localhost:8000
+cd src/agentic-ui   && npm install && npm run dev    # http://localhost:3000
+```
+
+## Deploy to Azure
+
+```bash
+azd auth login
+azd up   # provisions infra (infra/) and deploys all three services (azure.yaml)
+```
+
+See [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) for
+subscription prerequisites (RBAC, resource providers, model quota, region), and
+[`specs/lld-langgraph-foundry-agent.md`](specs/lld-langgraph-foundry-agent.md) for the target-state
+low-level design of the LangGraph-on-Foundry orchestrator.
+
+### Deploy with GitHub Copilot (recommended)
+
+Rather than running `azd up` yourself, let an agent drive the deployment end to end. Open this repo
+in [GitHub Copilot CLI](https://docs.github.com/copilot/concepts/agents/about-copilot-cli) (or any agent that can run `az`/`azd`) and point it at the deployment spec:
+
+```text
+Read specs/azure-deployment-requirements.md and deploy this project to Azure.
+Verify my az/azd login, check the gpt-4o-mini quota and resource providers in the target region,
+run azd up to a throwaway resource group, then smoke-test the agentic-ui endpoint and report back.
+```
+
+The agent uses [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) as the prerequisite checklist (RBAC, providers, quota, region, UI auth) and [`Spec2Cloud-about.md`](Spec2Cloud-about.md) 
+for the spec-driven workflow context, so it can diagnose and resolve common provisioning blockers (quota, base-image pull limits) without you stepping 
+through each command.
+
+### Author
+
+Henry Bravo - Sr. Solution Engineer Microsoft Cloud & AI
+
+## License
+
+[MIT](LICENSE.md)

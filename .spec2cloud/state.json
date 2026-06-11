@@ -1,0 +1,25 @@
+{
+  "mode": null,
+  "currentPhase": "0",
+  "draftSpecInput": null,
+  "productDiscovery": {
+    "specRefinement": { "status": "pending" },
+    "uiuxDesign": { "status": "pending" },
+    "incrementPlanning": { "status": "pending" },
+    "techStackResolution": { "status": "pending" }
+  },
+  "incrementPlan": [],
+  "increments": {},
+  "adrs": { "nextNumber": 1, "records": [] },
+  "techDecisions": [],
+  "humanGates": { "phase0-approved": false },
+  "operationalNotes": [],
+  "testsStatus": {
+    "unit": { "pass": 0, "fail": 0 },
+    "cucumber": { "pass": 0, "fail": 0 },
+    "playwright": { "pass": 0, "fail": 0 }
+  },
+  "currentIncrement": null,
+  "bugFixes": [],
+  "lastUpdated": "2026-06-10T10:19:19Z"
+}

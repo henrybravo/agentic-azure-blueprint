@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: agentic-azure-blueprint
+services:
+  agentic-api:
+    project: src/agentic-api
+    host: containerapp
+    language: python
+    docker:
+      remoteBuild: true
+      buildArgs:
+        - PYTHON_IMAGE=${AZURE_CONTAINER_REGISTRY_ENDPOINT}/python:3.11-slim
+  agentic-ui:
+    project: src/agentic-ui
+    host: containerapp
+    language: ts
+    docker:
+      remoteBuild: true
+      buildArgs:
+        - NODE_IMAGE=${AZURE_CONTAINER_REGISTRY_ENDPOINT}/node:20-slim
+  orchestrator:
+    project: src/orchestrator
+    host: containerapp
+    language: python
+    docker:
+      remoteBuild: true
+      buildArgs:
+        - PYTHON_IMAGE=${AZURE_CONTAINER_REGISTRY_ENDPOINT}/python:3.11-slim
+resources:
+  agentic-api:
+    type: host.containerapp
+    uses:
+      - orchestrator
+    port: 8080
+  agentic-ui:
+    type: host.containerapp
+    uses:
+      - agentic-api
+    port: 80
+  orchestrator:
+    type: host.containerapp
+    port: 8000
+hooks:
+  postprovision:
+    posix:
+      shell: sh
+      run: ./infra/scripts/postprovision.sh
+      continueOnError: false
+    windows:
+      shell: pwsh
+      run: ./infra/scripts/postprovision.ps1
+      continueOnError: false
