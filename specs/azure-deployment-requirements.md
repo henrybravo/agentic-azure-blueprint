@@ -131,8 +131,6 @@ model SKU + API Management (AI gateway) + Azure Storage (Blob)**. The verified d
 creates **no** Entra app registrations unless you wire them (see A.9). For the username/password
 gate, set `UI_AUTH_USERNAME` / `UI_AUTH_PASSWORD` on the `agentic-ui` container app.
 
----
-
 ### A.9 Entra ID app registrations - sign-in / OBO (**OPTIONAL**)  ⚠️ tenant privilege
 
 Entra ID sign-in is **optional**. The default fallback is the username/password gate (A.4), which
@@ -155,13 +153,9 @@ registrations (SPA + API), which need **Entra (directory) privilege**, separate 
 > unavailable. Downstream Azure calls run as the app's **managed identity** (independent of user
 > sign-in), and any per-user authorization must be enforced in the BFF.
 
----
+## B. Deployment additions
 
-## B. Target deployment additions (this customer)
-
-For this customer's **target deployment** these are **required** - the base shell runs without
-them, but the target includes durable state and the AI gateway. Verified from the same real
-deployment.
+The base shell runs without them, and **B** includes durable state and the AI gateway.
 
 ### B.1 Azure Cosmos DB - durable state
 
@@ -176,8 +170,6 @@ deployment.
   `AZURE_DEPLOY_APIM=true` for the target deployment.
 - For the content-safety policy, APIM's identity needs **Cognitive Services User** on a
   **Content Safety** resource.
-
----
 
 ## Quick checklist
 
