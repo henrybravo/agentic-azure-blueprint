@@ -232,13 +232,12 @@ top of the network isolation (§6.1) and is **optional**:
 > sign-in), and any per-user authorization must be enforced in the BFF (see **§6.2** for the
 > OBO-vs-trusted-subsystem alternative).
 
-### 6.1 BFF network isolation - "only the UI may call the BFF"
+### 6.1 BFF network isolation - only the UI may call the BFF
 
-The BFF can be restricted so that **only the UI** reaches it, but the available controls and their
-strength depend on the **UI→BFF call topology**. This shell uses `AGENT_API_URL` as a **server-only**
-env var (not `NEXT_PUBLIC_`), and the deployed reference (`kostenanalyse`) adds Next.js **server-side
-proxy routes** (e.g. `/api/me`). The intended path is therefore **browser → Next.js server → BFF**,
-which makes real network-level isolation feasible. Controls, weakest → strongest:
+The BFF must be restricted so that **only the UI** reaches it, the available controls and their strength 
+depend on the **UI→BFF call topology**. This shell uses `AGENT_API_URL` as a **server-only**
+env var, and Next.js adds **server-side proxy routes** (e.g. `/api/me`). The intended path is therefore 
+**browser → Next.js server → BFF**, which makes real network-level isolation feasible. Controls, weakest → strongest:
 
 | # | Control | What it restricts | Strength |
 |---|---------|-------------------|----------|
@@ -247,18 +246,11 @@ which makes real network-level isolation feasible. Controls, weakest → stronge
 | 3 | **IP restrictions** (`ipSecurityRestrictions`) on an external BFF | Caller source IP (= the env's static outbound IP when the UI calls server-side) | Medium - brittle; prefer #2. |
 | 4 | **Entra auth / OBO** at the BFF (+ optional UI-injected shared header) | *Who* may use the BFF (and optionally "came via the UI") | Real - the actual data-protection boundary. |
 
-**Caveat - topology dependency:** #2 and #3 only work because UI→BFF is **server-side**. If the
-browser called the BFF **directly** (a client SPA exposing a `NEXT_PUBLIC_` BFF URL), network-level
-"only the UI" is impossible - requests originate from arbitrary end-user IPs - leaving only CORS
-(weak) + auth (real).
-
-**Decision (target design):** make the BFF **internal** (`ingressExternal: false`, same ACA
-environment as the UI) and proxy browser calls through the Next.js server - this network isolation
+We make the BFF **internal** (`ingressExternal: false`, same ACA environment as the UI) 
+and proxy browser calls through the Next.js server - this network isolation
 is the **mandatory baseline** and is independent of authentication. UI authentication is layered on
 top and **optional**: the default fallback is a username/password gate
 (`UI_AUTH_USERNAME` / `UI_AUTH_PASSWORD`), and Entra ID sign-in / OBO is used when available (§6).
-The reference `kostenanalyse` deployment left the BFF external and relied on CORS + auth only; this
-LLD tightens that to internal ingress. See **ADR-001** (`specs/adrs/adr-001-bff-network-isolation.md`).
 
 ### 6.2 Per-user identity without Entra - OBO vs. trusted subsystem
 
@@ -318,8 +310,6 @@ flowchart LR
     class TSres,OBres dataNode
 ```
 
----
-
 ## 7. Capability 3 - Observability & tracing (OTel → App Insights → Foundry)
 
 **Verified target design.** Foundry documents a **first-class path for LangChain/LangGraph
@@ -360,8 +350,6 @@ replacing Foundry tracing.
 
 **This proves matrix row 3:** a LangGraph container on ACA exports the *same* traces into the
 *same* Foundry Observability surface as any other registered agent.
-
----
 
 ## 8. Capability 4 - Durability, session & state
 
@@ -428,8 +416,6 @@ by the framework**, not the runtime - identical on any container host.
 > Replaces the current `checkpointer.py`, whose Cosmos placeholder silently falls back to
 > in-memory - the silent fallback must be removed from production builds.
 
----
-
 ## 9. Capability 5 - Human-in-the-loop
 
 **Target design.** Use LangGraph's **`interrupt()`** primitive inside a node to pause the
@@ -449,8 +435,6 @@ def approval_node(state: AgentState):
 **Wire-up:** the orchestrator emits a `{"type":"interrupt","payload":...}` SSE event; the BFF/
 UI render an approve/reject control; the resume call hits `POST /turn` with the decision and
 the same `threadId`. Durable checkpointing makes the pause survivable across restarts.
-
----
 
 ## 10. Capability 6 - Tools (native functions and MCP)
 
@@ -513,8 +497,6 @@ With `MCP_GATEWAY_URL` unset the agent runs on **native tools alone**.
 Native tools run in-process and **bypass that hop**, so their safety is the developer's responsibility:
 validate inputs (Pydantic), use structured logging, and wrap every external call in error handling per
 repo conventions. Model-traffic content safety (§12) still applies regardless of the tool source.
-
----
 
 ## 11. Capability 7 - Multi-agent orchestration, topology & shared state
 
@@ -595,8 +577,6 @@ sub-graphs, one Cosmos-backed checkpointer). Promote a sub-graph to its **own co
 state mechanism (§8) and the same hub-mediated governance - the topology is an operational
 choice, not a capability change.
 
----
-
 ## 12. Capability 8 - Safety / guardrails
 
 **Verified target design.** Guardrails are enforced **at the APIM AI Gateway**, not in agent
@@ -621,8 +601,6 @@ Safety resource. Because the agent egresses *only* through the gateway (§2), gu
 **inescapable** - this is the mechanism by which a self-hosted LangGraph agent inherits
 platform-level responsible-AI controls.
 
----
-
 ## 13. Capability 9 - Evaluation & testing
 
 **Verified target design.** Use the **Azure AI Evaluation** capability via the Foundry SDK
@@ -638,8 +616,6 @@ safety, and agent behavior; results are viewable in Foundry and runnable in CI.
   managed agent runtime (proves matrix row 9).
 
 **Dependency to add:** `azure-ai-projects` (test/eval dependency group).
-
----
 
 ## 14. Capability 10 - Lifecycle & registry
 
@@ -667,8 +643,6 @@ flowchart LR
   it is centrally discoverable and governed - the registry is platform-level; container-hosted
   agents register via CI/CD (proves matrix row 10).
 
----
-
 ## 15. Capability 11 - Governance / compliance / audit
 
 **Target design.** Governance is composed *around* the agent, not inside it:
@@ -683,8 +657,6 @@ This posture is identical regardless of the container host, which is precisely t
 claim: governance, compliance, and auditability are **Foundry-platform + hub** properties, not
 properties of a specific agent runtime.
 
----
-
 ## 16. Configuration contract (orchestrator container)
 
 | Variable | Source | Purpose |
@@ -697,8 +669,6 @@ properties of a specific agent runtime.
 | `AZURE_COSMOS_ENDPOINT` | infra (Cosmos) | Durable checkpointer + long-term Store (§8) |
 | `MCP_GATEWAY_URL` | deploy config | APIM-fronted MCP tools |
 | `AZURE_AI_PROJECT_ENDPOINT` | infra | Evaluation SDK |
-
----
 
 ## 17. Request & HITL sequence
 
@@ -728,8 +698,6 @@ sequenceDiagram
     O-->>B: done event
     B-->>U: streamed answer
 ```
-
----
 
 ## 18. Implementation status & open items
 
