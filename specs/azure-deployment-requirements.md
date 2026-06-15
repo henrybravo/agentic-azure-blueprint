@@ -17,7 +17,7 @@
 | **Azure CLI (`az`)** | auth, ad-hoc checks | `azd auth login` uses it |
 | **Bicep** | IaC compile | bundled with `azd`/`az` |
 | Docker | **not required for deploy** | `azure.yaml` sets `remoteBuild: true` → images build **in ACR**, no local daemon |
-| .NET SDK 9, Python 3.11+ + `uv`, Node 20+ | **local run only** (`dotnet run apphost.cs`) | not needed to deploy |
+| .NET SDK 10, Python 3.11+ + `uv`, Node 24 | **local run only** (`dotnet run apphost.cs`) | not needed to deploy - full local-dev guide in **C** |
 
 > The dev container (`.devcontainer/`) ships all of the above preinstalled.
 
@@ -170,6 +170,85 @@ The base shell runs without them, and **B** includes durable state and the AI ga
   `AZURE_DEPLOY_APIM=true` for the target deployment.
 - For the content-safety policy, APIM's identity needs **Cognitive Services User** on a
   **Content Safety** resource.
+
+## C. Local development - run it on a laptop (no Azure, no Docker)
+
+> Local dev provisions **nothing in Azure** and needs **no container runtime**. All three
+> services run as **host processes** - under Aspire **(optional)** or launched directly - and the
+> orchestrator's model call is a built-in **offline echo stub** (`src/orchestrator/graph.py`
+> `_generate`), so the app runs end-to-end with **no live AI Foundry endpoint**. This makes the
+> local stack a self-contained **plan B**: you can build and demo the full UI → BFF → orchestrator
+> flow before any Azure target environment exists.
+
+### C.1 Why Docker is not needed locally
+
+Neither way of running the app (Aspire **or** standalone - see C.3) needs a container runtime,
+because the services are always **host processes**, never containers:
+
+- `orchestrator` & `agentic-api` run via `uv`/`uvicorn`; `agentic-ui` runs via `npm run dev`.
+- **Aspire doesn't change that.** Although Aspire is often associated with containers, in
+  `apphost.cs` it only registers **host-process** resources (`AddUvicornApp(...).WithUv()`,
+  `AddJavaScriptApp(...).WithNpm()`) - so `dotnet run apphost.cs` launches the same uvicorn/npm
+  processes you'd start by hand, with no Docker daemon involved.
+- `.PublishAsDockerFile()` applies only at **publish/deploy** time (`azd up`), not at
+  `dotnet run apphost.cs`. The `Dockerfile`s in `src/*/` and `azure.yaml` build images **for Azure
+  Container Apps** - they are not used by a local start.
+
+A container runtime is needed **only** if you opt into containers locally - building/running an
+image by hand, using the `.devcontainer/`, or running `azd package` locally. For plain dev (either
+option in C.3), none of that applies. (Even `azd up` builds images **in ACR** via
+`remoteBuild: true`, so a normal cloud deploy also needs no local Docker daemon - see A.1.)
+
+### C.2 Local toolchain
+
+| Tool | Purpose | Notes |
+|---|---|---|
+| **.NET SDK 10** | Aspire AppHost (`dotnet run apphost.cs`) | **only for the optional Aspire path**; matches `Aspire.AppHost.Sdk@13` in `apphost.cs` |
+| **Python 3.11+ + `uv`** | `orchestrator` + `agentic-api` | `uv` runs uvicorn/FastAPI and installs deps |
+| **Node 24 + `npm`** | `agentic-ui` (Next.js) | `npm ci` / `npm run dev` |
+| Docker | **not required** | only for local container builds or the optional dev container - C.1 |
+
+> The dev container (`.devcontainer/`) ships all of the above preinstalled (and, being a
+> container, is the one local path that *does* need a container runtime).
+
+### C.3 Run it - Aspire is optional
+
+**Aspire is a convenience, not a requirement.** It orchestrates all three services with one
+command and adds a dashboard (logs, traces, endpoints), which is handy as a **plan B** while the
+Azure target environment isn't ready yet. But the services are plain uvicorn/Next.js processes,
+so you can skip Aspire entirely and run them directly - then **.NET SDK 10 is not needed**.
+
+```bash
+# Option 1 (optional): Aspire orchestrates all three services + dashboard. Needs .NET SDK 10.
+dotnet run apphost.cs
+# UI :3000  |  BFF :8080  |  orchestrator :8000  |  dashboard :15888
+
+# Option 2: run each service directly (no Aspire, no .NET), in three terminals:
+cd src/orchestrator && uv run fastapi dev main.py
+cd src/agentic-api  && uv run fastapi dev main.py
+cd src/agentic-ui   && npm run dev
+```
+
+Either option behaves identically at the app level; Aspire just wires the inter-service env vars
+(`ORCHESTRATOR_URL`, `AGENT_API_URL`) and waits for dependencies for you. Running directly, set
+those yourself (see the per-service `.env` files in AGENTS.md).
+
+The shell answers with the offline echo stub out of the box. To exercise a **real model** locally,
+point `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT_NAME` at a deployment and wire `_generate`
+to it (via managed identity / `DefaultAzureCredential`, never API keys) - see the TODO in
+`src/orchestrator/graph.py`. No model wiring is required just to run the app.
+
+### C.4 Workstation prerequisites (network / access)
+
+- **[VS Code + GitHub Copilot](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-extension)**
+  (or another editor: JetBrains IDEs, Visual Studio, Eclipse, Vim/Neovim, Xcode, Azure Data Studio
+- **Python + npm package access** - reach **PyPI** (for `uv`) and the **npm registry** to restore
+  dependencies; an internal mirror/proxy works equally well.
+- **Container base-image access** - **only if** you build images locally or use the dev container:
+  pull access to the relevant registries (Docker Hub, **GHCR**, **ACR**, etc.). Not needed for a
+  plain host-process dev run.
+- **Shared GitHub repository** - obvious but recommended so a prototype team works off one source
+  of truth.
 
 ## Quick checklist
 
