@@ -18,15 +18,6 @@ param location string
 @description('Location for the Azure AI Foundry model deployment.')
 param aiDeploymentsLocation string
 
-@description('Whether the agentic-api container app already exists (azd-managed).')
-param agenticApiExists bool
-
-@description('Whether the agentic-ui container app already exists (azd-managed).')
-param agenticUiExists bool
-
-@description('Whether the orchestrator container app already exists (azd-managed).')
-param orchestratorExists bool
-
 @description('Id of the user or app to assign application roles.')
 param principalId string
 
@@ -80,9 +71,6 @@ module resources 'resources.bicep' = {
     tags: tags
     principalId: principalId
     principalType: principalType
-    agenticApiExists: agenticApiExists
-    agenticUiExists: agenticUiExists
-    orchestratorExists: orchestratorExists
     openAiEndpoint: aiModelsDeploy.outputs.OPENAI_ENDPOINT
     deploymentName: deploymentName
   }

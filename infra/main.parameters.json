@@ -16,15 +16,6 @@
     },
     "principalType": {
       "value": "${AZURE_PRINCIPAL_TYPE=User}"
-    },
-    "agenticApiExists": {
-      "value": "${SERVICE_AGENTIC_API_RESOURCE_EXISTS=false}"
-    },
-    "agenticUiExists": {
-      "value": "${SERVICE_AGENTIC_UI_RESOURCE_EXISTS=false}"
-    },
-    "orchestratorExists": {
-      "value": "${SERVICE_ORCHESTRATOR_RESOURCE_EXISTS=false}"
     }
   }
 }

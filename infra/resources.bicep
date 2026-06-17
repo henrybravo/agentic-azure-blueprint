@@ -10,10 +10,6 @@ param principalId string
 @description('Principal type of user or app (User or ServicePrincipal).')
 param principalType string
 
-param agenticApiExists bool
-param agenticUiExists bool
-param orchestratorExists bool
-
 @description('Azure OpenAI endpoint injected into the apps.')
 param openAiEndpoint string
 
@@ -70,6 +66,12 @@ module containerAppsEnvironment 'br/public:avm/res/app/managed-environment:0.8.0
 }
 
 var placeholderImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+// Every app is provisioned with the placeholder image; `azd deploy` then builds and pushes the real
+// image and updates the app. This is deadlock-proof: provisioning never references an ACR image that
+// does not exist yet, so a failed/partial first deploy self-heals on the next `azd up` with no need
+// to delete the app or fiddle with SERVICE_*_RESOURCE_EXISTS (which azd re-detects each run anyway).
+// Trade-off: running `azd provision` on its own reverts the apps to the placeholder until the next
+// `azd deploy`; the `azd up` / `azd deploy` flow always ends on the real image.
 // No AZURE_CLIENT_ID: a system-assigned identity is auto-detected by DefaultAzureCredential.
 var commonEnv = [
   {
@@ -106,7 +108,7 @@ module orchestrator 'br/public:avm/res/app/container-app:0.11.0' = {
     containers: [
       {
         name: 'orchestrator'
-        image: orchestratorExists ? '${containerRegistry.outputs.loginServer}/orchestrator:latest' : placeholderImage
+        image: placeholderImage
         env: commonEnv
         resources: {
           cpu: json('0.5')
@@ -137,7 +139,7 @@ module agenticApi 'br/public:avm/res/app/container-app:0.11.0' = {
     containers: [
       {
         name: 'agentic-api'
-        image: agenticApiExists ? '${containerRegistry.outputs.loginServer}/agentic-api:latest' : placeholderImage
+        image: placeholderImage
         env: union(commonEnv, [
           {
             name: 'ORCHESTRATOR_URL'
@@ -173,7 +175,7 @@ module agenticUi 'br/public:avm/res/app/container-app:0.11.0' = {
     containers: [
       {
         name: 'agentic-ui'
-        image: agenticUiExists ? '${containerRegistry.outputs.loginServer}/agentic-ui:latest' : placeholderImage
+        image: placeholderImage
         env: [
           {
             name: 'AGENT_API_URL'
