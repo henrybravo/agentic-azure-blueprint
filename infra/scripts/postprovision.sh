@@ -58,4 +58,27 @@ import_image "python:3.11-slim" "mcr.microsoft.com/mirror/docker/library/python:
 import_image "node:20-slim"     "mcr.microsoft.com/mirror/docker/library/node:20-bookworm-slim"
 
 echo "postprovision: base-image import complete for $acr_name."
+
+# --- Configure each app's ACR registry with its system-assigned identity ---
+# The container apps are provisioned WITHOUT a registries block (see resources.bicep: that would
+# deadlock, because ACA validates the registry against the system identity before AcrPull is
+# granted). Provisioning has now granted AcrPull to each app's system identity, so it is safe to
+# attach the registry here with `--identity system`. `azd deploy` then pulls the real images.
+# Warn-only: a transient RBAC-propagation miss is healed by the deploy revision that follows.
+configure_registry() {
+  app_id="$1"
+  [ -z "$app_id" ] && return 0
+  rg=$(printf '%s' "$app_id" | sed -n 's#.*/resourceGroups/\([^/]*\)/.*#\1#p')
+  name=$(printf '%s' "$app_id" | sed -n 's#.*/containerApps/\([^/]*\).*#\1#p')
+  echo "postprovision: configuring ACR registry on $name (identity: system) ..."
+  if ! az containerapp registry set -g "$rg" -n "$name" \
+      --server "$AZURE_CONTAINER_REGISTRY_ENDPOINT" --identity system >/dev/null 2>&1; then
+    echo "WARNING: could not set registry on $name; azd deploy will retry the pull once RBAC propagates."
+  fi
+}
+
+configure_registry "$AZURE_RESOURCE_ORCHESTRATOR_ID"
+configure_registry "$AZURE_RESOURCE_AGENTIC_API_ID"
+configure_registry "$AZURE_RESOURCE_AGENTIC_UI_ID"
+
 echo "TODO: create Entra app registrations / assign extra roles here as your app needs them."

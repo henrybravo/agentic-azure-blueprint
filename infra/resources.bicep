@@ -97,12 +97,6 @@ module orchestrator 'br/public:avm/res/app/container-app:0.11.0' = {
     tags: union(tags, { 'azd-service-name': 'orchestrator' })
     environmentResourceId: containerAppsEnvironment.outputs.resourceId
     managedIdentities: { systemAssigned: true }
-    registries: [
-      {
-        server: containerRegistry.outputs.loginServer
-        identity: 'system'
-      }
-    ]
     ingressExternal: false
     ingressTargetPort: 8000
     containers: [
@@ -128,12 +122,6 @@ module agenticApi 'br/public:avm/res/app/container-app:0.11.0' = {
     tags: union(tags, { 'azd-service-name': 'agentic-api' })
     environmentResourceId: containerAppsEnvironment.outputs.resourceId
     managedIdentities: { systemAssigned: true }
-    registries: [
-      {
-        server: containerRegistry.outputs.loginServer
-        identity: 'system'
-      }
-    ]
     ingressExternal: false
     ingressTargetPort: 8080
     containers: [
@@ -164,12 +152,6 @@ module agenticUi 'br/public:avm/res/app/container-app:0.11.0' = {
     tags: union(tags, { 'azd-service-name': 'agentic-ui' })
     environmentResourceId: containerAppsEnvironment.outputs.resourceId
     managedIdentities: { systemAssigned: true }
-    registries: [
-      {
-        server: containerRegistry.outputs.loginServer
-        identity: 'system'
-      }
-    ]
     ingressExternal: true
     ingressTargetPort: 3000
     containers: [
@@ -193,8 +175,17 @@ module agenticUi 'br/public:avm/res/app/container-app:0.11.0' = {
 
 // --- AcrPull for each app's system-assigned identity ---
 // Assigned after the apps exist, since a system-assigned principalId is created with its app.
-// First deploy runs the public placeholder image (no ACR pull needed); `azd deploy` then pushes
-// the real images, which the now-authorized system identities can pull.
+//
+// IMPORTANT (system-assigned + ACR chicken-and-egg): the apps deliberately do NOT declare a
+// `registries` block. Azure Container Apps validates every configured registry at *revision*
+// creation, so a registry referencing the not-yet-authorized system identity would fail with a 401
+// ("ACR token exchange endpoint returned error status: 401") and the revision — hence the whole app
+// module — would never complete, so this AcrPull role could never be assigned. A hard deadlock.
+// Instead: provision the apps on the public placeholder image (no registry needed), grant AcrPull
+// here, then the `postprovision` hook configures each app's registry with `--identity system`
+// (by which point the role is assigned). `azd deploy` then pushes the real images and pulls them.
+// (The user-assigned `main` branch does NOT have this problem: its UAMI exists before the apps and
+// is granted AcrPull up-front, so it keeps the `registries` block inline.)
 resource acrResource 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: '${abbrs.containerRegistryRegistries}${resourceToken}'
 }
