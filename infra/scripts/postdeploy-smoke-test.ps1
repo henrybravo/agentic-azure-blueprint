@@ -139,7 +139,15 @@ $env = az containerapp show -g $ResourceGroup -n orchestrator `
 $envNames = $env.name
 Assert "AZURE_OPENAI_ENDPOINT injected into orchestrator"        ($envNames -contains "AZURE_OPENAI_ENDPOINT")
 Assert "AZURE_OPENAI_DEPLOYMENT_NAME injected into orchestrator"  ($envNames -contains "AZURE_OPENAI_DEPLOYMENT_NAME")
-Assert "AZURE_CLIENT_ID injected (managed identity)"             ($envNames -contains "AZURE_CLIENT_ID")
+# Managed-identity wiring differs by branch: the user-assigned variant (main) injects
+# AZURE_CLIENT_ID so DefaultAzureCredential targets that identity; the system-assigned
+# variant (this branch) injects nothing - DefaultAzureCredential picks up the app's
+# system-assigned identity automatically. Pass on either valid wiring.
+$identityType = az containerapp show -g $ResourceGroup -n orchestrator --query "identity.type" -o tsv
+$hasClientId = $envNames -contains "AZURE_CLIENT_ID"
+$hasSystemAssigned = $identityType -match "SystemAssigned"
+Assert "Orchestrator has managed identity (AZURE_CLIENT_ID or system-assigned)" `
+    ($hasClientId -or $hasSystemAssigned) "identity.type=$identityType, AZURE_CLIENT_ID present=$hasClientId"
 $deployEnv = ($env | Where-Object { $_.name -eq "AZURE_OPENAI_DEPLOYMENT_NAME" }).value
 Assert "Deployment name env matches a real model deployment" ($deployments.name -contains $deployEnv) "env=$deployEnv"
 
