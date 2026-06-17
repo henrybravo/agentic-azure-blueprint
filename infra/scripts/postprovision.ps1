@@ -4,6 +4,16 @@
 # remote image builds pull them from ACR (authenticated) instead of Docker Hub — avoiding the
 # anonymous pull rate limit ("toomanyrequests") that fails azd's remote build. Also the natural
 # place to wire anything that can't live in Bicep (e.g. Entra app registrations for OBO).
+#
+# Base images are sourced from the Microsoft Artifact Registry (MCR) Docker mirror
+# (mcr.microsoft.com/mirror/docker/library/*), which is Microsoft-operated, needs no Docker Hub
+# login, and is NOT subject to Docker Hub's anonymous pull rate limit. node:20-slim maps to the
+# Debian bookworm-slim variant — the same base Docker Hub's node:20-slim currently aliases.
+#
+# Optional break-glass: if a primary import fails and BASEIMAGE_FALLBACK_REGISTRY is set, the image
+# is re-imported from <BASEIMAGE_FALLBACK_REGISTRY>/<image> (e.g. another ACR you control). Set
+# BASEIMAGE_FALLBACK_USERNAME / BASEIMAGE_FALLBACK_PASSWORD for an authenticated fallback (omit for
+# an anonymous-pull ACR). Wire it with `azd env set` — see HACKATHON.md "Base images".
 $ErrorActionPreference = 'Stop'
 
 $acrEndpoint = $env:AZURE_CONTAINER_REGISTRY_ENDPOINT
@@ -14,21 +24,34 @@ if (-not $acrEndpoint) {
 
 $acrName = $acrEndpoint.Split('.')[0]
 
-# (image, source) pairs. Prefer the Microsoft Artifact Registry Docker mirror
-# (mcr.microsoft.com/mirror/docker/library/*) where available — it is not subject to Docker Hub's
-# anonymous pull rate limit. The mirror is an allow-listed subset, so images it does not carry
-# (e.g. node:20-slim) fall back to docker.io and are best-effort: a failed import prints a warning
-# and the remote build will still try Docker Hub directly.
-$imports = @(
-    @{ image = 'python:3.11-slim'; source = 'mcr.microsoft.com/mirror/docker/library/python:3.11-slim' },
-    @{ image = 'node:20-slim';     source = 'docker.io/library/node:20-slim' }
-)
-foreach ($i in $imports) {
-    Write-Host "postprovision: importing $($i.image) into $acrName (from $($i.source)) ..."
-    az acr import --name $acrName --source $i.source --image $i.image --force | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "postprovision: import of $($i.image) failed (likely Docker Hub rate limit). The remote build will fall back to Docker Hub; pre-import it manually if the build fails."
+# Warn-only so a transient import miss never aborts the deploy; the remote build surfaces a hard
+# error if a base image is genuinely missing.
+function Import-BaseImage {
+    param([string]$Image, [string]$Source)
+    Write-Host "postprovision: importing $Image into $acrName (from $Source) ..."
+    az acr import --name $acrName --source $Source --image $Image --force 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Warning "primary import of $Image failed."
+    if ($env:BASEIMAGE_FALLBACK_REGISTRY) {
+        $fb = "$($env:BASEIMAGE_FALLBACK_REGISTRY)/$Image"
+        Write-Host "postprovision: retrying $Image from fallback $fb ..."
+        if ($env:BASEIMAGE_FALLBACK_USERNAME) {
+            az acr import --name $acrName --source $fb --image $Image --force `
+                --username $env:BASEIMAGE_FALLBACK_USERNAME --password $env:BASEIMAGE_FALLBACK_PASSWORD 2>$null | Out-Null
+        } else {
+            az acr import --name $acrName --source $fb --image $Image --force 2>$null | Out-Null
+        }
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "postprovision: fallback import of $Image succeeded."
+            return
+        }
+        Write-Warning "fallback import of $Image also failed."
     }
+    Write-Warning "$Image not imported. The remote build will try to pull it directly and may fail; pre-import it manually (see HACKATHON.md)."
 }
+
+Import-BaseImage -Image 'python:3.11-slim' -Source 'mcr.microsoft.com/mirror/docker/library/python:3.11-slim'
+Import-BaseImage -Image 'node:20-slim'     -Source 'mcr.microsoft.com/mirror/docker/library/node:20-bookworm-slim'
+
 Write-Host "postprovision: base-image import complete for $acrName."
 Write-Host "TODO: create Entra app registrations / assign extra roles here as your app needs them."

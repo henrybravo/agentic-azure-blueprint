@@ -90,11 +90,42 @@ landing page (`src/agentic-ui/app/page.tsx`) with your domain.
 | Provisioning fails: **resource type / provider not registered** | Provider not registered on the subscription | `az provider register --namespace <ns>` for the namespaces in §A.3 (and §B.1/§B.2) |
 | `azd up` fails creating a **user-assigned identity** | Azure Policy blocks `Microsoft.ManagedIdentity/userAssignedIdentities` | You're on the right branch — this `feature/system-assigned-identity` branch avoids UAMI. Don't switch to `main` in such tenants |
 | **Cognitive Services / AI account** creation denied | Policy forces private networking / denies public Cognitive Services | Adjust the public-default Bicep first, or use a compliant subscription — §A.7 |
-| Container image build/pull fails on **Docker Hub rate limit** | Anonymous base-image pull throttled | Use the ACR-hosted base image (`NODE_IMAGE` build arg → `cr*.azurecr.io/node:20-slim`); `remoteBuild: true` builds in ACR |
+| Container image build/pull fails on **Docker Hub rate limit** (`toomanyrequests`) | A base image wasn't seeded into the project ACR | By default `postprovision` imports both base images from the **MCR mirror** (no Docker Hub, no login) — so this should not happen. If it does, re-run `azd provision` (re-runs the hook), or set a fallback source: `azd env set BASEIMAGE_FALLBACK_REGISTRY <registry>` (see "Base images" below) and re-provision |
 | Deployed app **returns the echo stub**, never a real answer | Fail-closed model egress; APIM not enabled | Set `AZURE_DEPLOY_APIM=true` and grant APIM's identity the Cognitive Services roles — §B.2 |
 | **Can't create Entra app registrations** for sign-in | No directory privilege | Use the **username/password gate** (`UI_AUTH_USERNAME` / `UI_AUTH_PASSWORD`) — no directory privilege needed — §A.9 |
 | Smoke test: **`pwsh` not found** | PowerShell 7 not installed (Linux/macOS) | `winget/brew/apt install powershell`, then `pwsh ./infra/scripts/postdeploy-smoke-test.ps1` |
 | Local app runs but **no model output** | `_generate` is an offline stub by design | Wire it to a deployment via `DefaultAzureCredential` (no keys) — LLD §5 / §C.3 |
+
+## Base images (no Docker Hub login required)
+
+Container images build **remotely in ACR** (`remoteBuild: true`) from base images that are first
+imported into the **project ACR** by the `postprovision` hook. Both bases come from the
+**Microsoft Artifact Registry (MCR) Docker mirror** — Microsoft-operated, no Docker Hub login, and
+**not subject to Docker Hub's anonymous pull rate limit**:
+
+| Base | Imported from | Tagged in ACR as |
+|---|---|---|
+| `python:3.11-slim` | `mcr.microsoft.com/mirror/docker/library/python:3.11-slim` | `python:3.11-slim` |
+| `node:20-slim` | `mcr.microsoft.com/mirror/docker/library/node:20-bookworm-slim` | `node:20-slim` |
+
+> `node:20-bookworm-slim` is the Debian image Docker Hub's `node:20-slim` currently aliases, so it is
+> a drop-in. **Result: the deploy never touches Docker Hub** — you do *not* need to pre-stage your
+> own registry. (The `FROM` defaults in `src/*/Dockerfile` still reference Docker Hub for a *plain
+> local* `docker build`; `azd` overrides them to the ACR copy via `azure.yaml` buildArgs.)
+
+**Break-glass (only if a primary import ever fails).** Point the hook at any registry you control —
+e.g. an ACR that already holds the images — without editing files:
+
+```bash
+azd env set BASEIMAGE_FALLBACK_REGISTRY myacr.azurecr.io        # source: <registry>/<image>
+# authenticated source (omit for an anonymous-pull ACR):
+azd env set BASEIMAGE_FALLBACK_USERNAME <token-name>
+azd env set BASEIMAGE_FALLBACK_PASSWORD <token-password>
+azd provision                                                   # re-runs the import hook
+```
+
+The fallback fires **only** when the MCR import fails, so it is a safety net, not a dependency. To
+pre-seed an ACR for it: `az acr import --name myacr --source mcr.microsoft.com/mirror/docker/library/node:20-bookworm-slim --image node:20-slim` (and the python equivalent).
 
 ## Reference map
 
