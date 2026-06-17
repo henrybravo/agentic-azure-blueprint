@@ -10,7 +10,7 @@ the [spec2cloud](https://github.com/EmeaAppGbb/spec2cloud) spec-driven-developme
 |------|--------------|
 | **Services** (`src/`) | `agentic-ui` (Next.js 16), `agentic-api` (FastAPI BFF), `orchestrator` (LangGraph) |
 | **Local orchestration** _(optional)_ | `apphost.cs` - .NET Aspire runs all three + a dashboard; each service also runs standalone (see below) |
-| **Infra** (`infra/`) | Bicep (Azure Verified Modules): Container Apps env, ACR, managed identity, App Insights, AI Foundry model |
+| **Infra** (`infra/`) | Bicep (Azure Verified Modules): Container Apps env, ACR, system-assigned managed identity, App Insights, AI Foundry model |
 | **Deploy** | `azure.yaml` + `azd up` |
 | **SDD framework** (`.github/`) | spec2cloud agents, prompts, and 40+ skills |
 | **SDD state** (`.spec2cloud/`) | `state.json` (resumable source of truth) + `audit.log` (append-only trail) |
@@ -37,7 +37,7 @@ flowchart TD
     subgraph Azure["Azure PaaS - infra/ Bicep (AVM)"]
         AI["AI Foundry<br/><i>model deployment</i>"]
         ACR["Container Registry"]
-        UAMI["Managed identity"]
+        UAMI["Managed identity<br/><i>system-assigned, per app</i>"]
         MON["App Insights<br/>Log Analytics"]
         COSMOS[("Cosmos DB<br/><i>optional - memory seam</i>")]
     end
@@ -100,6 +100,18 @@ See [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requiremen
 subscription prerequisites (RBAC, resource providers, model quota, region), and
 [`specs/lld-langgraph-foundry-agent.md`](specs/lld-langgraph-foundry-agent.md) for the target-state
 low-level design of the LangGraph-on-Foundry orchestrator.
+
+> **Identity model - this branch uses system-assigned managed identity.** Each Container App gets
+> its own **system-assigned** identity instead of a shared user-assigned identity, so `azd up`
+> succeeds where Azure Policy blocks `Microsoft.ManagedIdentity/userAssignedIdentities` (common in
+> regulated/FSI tenants). It is functionally equivalent - Foundry auth, ACR image pull, and
+> `DefaultAzureCredential` all work, with no `AZURE_CLIENT_ID` needed. **Trade-offs:** one identity
+> per app (no shared identity), RBAC is assigned after each app exists, and the identity is deleted
+> with its app. The orchestrator's identity is granted **Cognitive Services OpenAI User** so it can
+> call the model once you replace the stubbed `_generate` in `src/orchestrator/graph.py`. For a
+> shared identity or pre-provisioned RBAC, use the user-assigned variant on `main`. See
+> [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) (Identity model)
+> and [`specs/lld-langgraph-foundry-agent.md`](specs/lld-langgraph-foundry-agent.md) (§6).
 
 ### Deploy with GitHub Copilot (recommended)
 

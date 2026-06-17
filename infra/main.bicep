@@ -85,6 +85,7 @@ module resources 'resources.bicep' = {
     orchestratorExists: orchestratorExists
     openAiEndpoint: aiModelsDeploy.outputs.OPENAI_ENDPOINT
     deploymentName: deploymentName
+    aiAccountName: aiModelsDeploy.outputs.aiServicesAccountName
   }
 }
 

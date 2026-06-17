@@ -20,6 +20,9 @@ param openAiEndpoint string
 @description('Model deployment name injected into the apps.')
 param deploymentName string
 
+@description('Name of the Azure AI/OpenAI account, used to grant the orchestrator runtime model access.')
+param aiAccountName string
+
 var abbrs = loadJsonContent('abbreviations.json')
 var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, location))
 
@@ -226,6 +229,28 @@ resource agenticUiAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' =
     principalId: agenticUi.outputs.systemAssignedMIPrincipalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: acrPullRoleDefinitionId
+  }
+}
+
+// --- Model access for the orchestrator's system-assigned identity ---
+// The orchestrator is the only service that calls the Foundry/OpenAI model (see
+// src/orchestrator/graph.py). Granting "Cognitive Services OpenAI User" on the AI account lets it
+// authenticate to the model with its managed identity (DefaultAzureCredential) — no API keys. The
+// shell ships with a stubbed model call, so this permission is unused until that stub is replaced.
+// If another service (e.g. the BFF) starts calling the model, add the same assignment for its identity.
+resource aiAccountResource 'Microsoft.CognitiveServices/accounts@2025-04-01-preview' existing = {
+  name: aiAccountName
+}
+
+var cognitiveServicesOpenAIUserRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd')
+
+resource orchestratorOpenAIUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: aiAccountResource
+  name: guid(aiAccountResource.id, 'orchestrator', cognitiveServicesOpenAIUserRoleDefinitionId)
+  properties: {
+    principalId: orchestrator.outputs.systemAssignedMIPrincipalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: cognitiveServicesOpenAIUserRoleDefinitionId
   }
 }
 

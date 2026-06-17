@@ -25,8 +25,9 @@
 
 `infra/main.bicep` is **subscription-scoped**: it creates the resource group *and* creates
 **role assignments** (`ai-project.bicep` grants the deployer Azure AI Developer + Cognitive
-Services User; `resources.bicep` grants the managed identity AcrPull). Creating role
-assignments requires `Microsoft.Authorization/roleAssignments/write`.
+Services User; `resources.bicep` grants each app's system-assigned identity AcrPull and the
+orchestrator Cognitive Services OpenAI User). Creating role assignments requires
+`Microsoft.Authorization/roleAssignments/write`.
 
 **Minimum required, at subscription scope:**
 
@@ -46,7 +47,7 @@ when `principalType == User`.
 | `Microsoft.CognitiveServices` | Foundry (AI Services) account, project, model deployment |
 | `Microsoft.App` | Container Apps environment + 3 container apps |
 | `Microsoft.ContainerRegistry` | ACR (image build + pull) |
-| `Microsoft.ManagedIdentity` | user-assigned managed identity |
+| `Microsoft.ManagedIdentity` | *system-assigned identities (no standalone `userAssignedIdentities` resource is created on this branch)* |
 | `Microsoft.OperationalInsights` | Log Analytics workspace |
 | `Microsoft.Insights` | Application Insights |
 | `Microsoft.Portal` | provisioned dashboard |
@@ -64,8 +65,18 @@ From the verified provision run, the base shell creates:
   a **Foundry project**, and one **model deployment**.
 - **Container Registry** (**Basic**, admin user disabled - pull via managed identity).
 - **Container Apps Environment** + **3 container apps** (ui external; api + orchestrator internal).
-- **User-assigned managed identity** (shared by the apps; granted AcrPull).
+- **System-assigned managed identity** (one per app; each granted AcrPull, the orchestrator also
+  granted Cognitive Services OpenAI User on the AI account for model access).
 - **Log Analytics workspace**, **Application Insights**, **Portal dashboard**.
+
+> **Identity model (this branch).** The apps use **system-assigned** managed identity (one per
+> Container App) instead of a shared user-assigned identity, so deployment succeeds where Azure
+> Policy blocks `Microsoft.ManagedIdentity/userAssignedIdentities` (common in regulated/FSI tenants).
+> Functionally equivalent - Foundry auth, ACR pull, and `DefaultAzureCredential` all work. Trade-offs:
+> one identity per app (no shared identity), RBAC is assigned **after** each app exists (the first
+> deploy runs the public placeholder image, so no ACR pull is needed before the role lands), and the
+> identity is deleted with its app. For a shared identity or pre-provisioned RBAC, use the
+> user-assigned variant on `main`.
 
 Networking and access controls:
 

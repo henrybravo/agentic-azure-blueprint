@@ -184,7 +184,7 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from langchain_openai import AzureChatOpenAI
 
 token_provider = get_bearer_token_provider(
-    DefaultAzureCredential(managed_identity_client_id=os.environ["AZURE_CLIENT_ID"]),
+    DefaultAzureCredential(),  # system-assigned identity is auto-detected; no AZURE_CLIENT_ID
     "https://cognitiveservices.azure.com/.default",
 )
 
@@ -196,8 +196,9 @@ model = AzureChatOpenAI(
 )
 ```
 
-**Repo wiring already present:** `infra/resources.bicep` injects `AZURE_OPENAI_ENDPOINT`,
-`AZURE_OPENAI_DEPLOYMENT_NAME`, and `AZURE_CLIENT_ID` (user-assigned MI) into every container.
+**Repo wiring already present:** `infra/resources.bicep` injects `AZURE_OPENAI_ENDPOINT` and
+`AZURE_OPENAI_DEPLOYMENT_NAME` into every container (no `AZURE_CLIENT_ID` - the system-assigned
+identity is auto-detected by `DefaultAzureCredential`).
 `infra/ai-project.bicep` provisions the Foundry account + project + a `gpt-4o-mini` deployment.
 **Design change:** point `AZURE_OPENAI_ENDPOINT` at the APIM gateway, not the raw account, so
 guardrails (§12) are inescapable.
@@ -209,10 +210,16 @@ guardrails (§12) are inescapable.
 
 ## 6. Capability 2 - Agent identity
 
-**Target design.** The container authenticates with a **user-assigned managed identity**
-(already provisioned: `infra/resources.bicep` `uami`, injected as `AZURE_CLIENT_ID`). The same
-identity is granted **Cognitive Services User / Foundry User** on the model/project and
-**AcrPull** on the registry. `DefaultAzureCredential` resolves it at runtime.
+**Target design (this branch).** Each container authenticates with its own **system-assigned
+managed identity** (`infra/resources.bicep`, `managedIdentities.systemAssigned`). The
+orchestrator's identity is granted **Cognitive Services OpenAI User** on the AI account (model
+access) and **AcrPull** on the registry; the BFF and UI identities are granted **AcrPull**.
+`DefaultAzureCredential` resolves the system-assigned identity at runtime - no `AZURE_CLIENT_ID`.
+
+> **Why system-assigned here.** This branch targets tenants where Azure Policy blocks
+> `Microsoft.ManagedIdentity/userAssignedIdentities`. Trade-off vs. the user-assigned variant on
+> `main`: one identity per app (no shared identity), RBAC assigned **after** each app exists, and the
+> identity is deleted with its app. Functionally equivalent for Foundry/ACR access.
 
 Identity is **platform-level**, not runtime-specific: workload/managed identity and Entra
 agent identity apply to any agent the platform fronts, regardless of where the container runs.
@@ -663,7 +670,6 @@ properties of a specific agent runtime.
 |---|---|---|
 | `AZURE_OPENAI_ENDPOINT` | infra (→ APIM gateway) | Model egress through the hub |
 | `AZURE_OPENAI_DEPLOYMENT_NAME` | infra | Model deployment name |
-| `AZURE_CLIENT_ID` | infra (UAMI) | Managed-identity client id |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | infra | OTel export target |
 | `AGENT_ID` / `AGENT_NAME` | deploy config | Trace correlation + registry |
 | `AZURE_COSMOS_ENDPOINT` | infra (Cosmos) | Durable checkpointer + long-term Store (§8) |
