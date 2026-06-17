@@ -49,6 +49,7 @@ when `principalType == User`.
 | `Microsoft.ManagedIdentity` | *system-assigned identities (no standalone `userAssignedIdentities` resource is created on this branch)* |
 | `Microsoft.OperationalInsights` | Log Analytics workspace |
 | `Microsoft.Insights` | Application Insights |
+| `Microsoft.AlertsManagement` | Application Insights **failure-anomalies smart-detector alert rule** (auto-created by the monitoring module) ⚠️ commonly **not** registered by default |
 | `Microsoft.Portal` | provisioned dashboard |
 
 Register any that are not yet registered, e.g. `az provider register --namespace Microsoft.App`.
@@ -285,7 +286,7 @@ to it (via managed identity / `DefaultAzureCredential`, never API keys) - see th
 - [ ] Base resource providers registered (A.3): `Microsoft.Resources`,
       `Microsoft.CognitiveServices`, `Microsoft.App`, `Microsoft.ContainerRegistry`,
       `Microsoft.ManagedIdentity`, `Microsoft.OperationalInsights`, `Microsoft.Insights`,
-      `Microsoft.Portal`
+      `Microsoft.AlertsManagement`, `Microsoft.Portal`
 - [ ] Target-deployment providers registered: **`Microsoft.DocumentDB`** (Cosmos DB state) and
       **`Microsoft.ApiManagement`** (AI gateway) - B.1 / B.2
 - [ ] **≥10K TPM GlobalStandard quota** for `gpt-4o-mini` (or the chosen model - *tbd*) in the
