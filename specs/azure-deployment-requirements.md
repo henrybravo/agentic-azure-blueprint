@@ -17,7 +17,7 @@
 | **Azure CLI (`az`)** | auth, ad-hoc checks | `azd auth login` uses it |
 | **Bicep** | IaC compile | bundled with `azd`/`az` |
 | Docker | **not required for deploy** | `azure.yaml` sets `remoteBuild: true` → images build **in ACR**, no local daemon |
-| .NET SDK 10, Python 3.11+ + `uv`, Node 24 | **local run only** (`dotnet run apphost.cs`) | not needed to deploy - full local-dev guide in **C** |
+| .NET SDK 10, Python 3.11+ + `uv`, Node 20+ | **local run only** (`dotnet run apphost.cs`) | not needed to deploy - full local-dev guide in **C** |
 
 > The dev container (`.devcontainer/`) ships all of the above preinstalled.
 
@@ -230,7 +230,7 @@ option in C.3), none of that applies. (Even `azd up` builds images **in ACR** vi
 |---|---|---|
 | **.NET SDK 10** | Aspire AppHost (`dotnet run apphost.cs`) | **only for the optional Aspire path**; matches `Aspire.AppHost.Sdk@13` in `apphost.cs` |
 | **Python 3.11+ + `uv`** | `orchestrator` + `agentic-api` | `uv` runs uvicorn/FastAPI and installs deps |
-| **Node 24 + `npm`** | `agentic-ui` (Next.js) | `npm ci` / `npm run dev` |
+| **Node 20+ + `npm`** | `agentic-ui` (Next.js 16) | `npm ci` / `npm run dev` (image is `node:20-slim`) |
 | Docker | **not required** | only for local container builds or the optional dev container - C.1 |
 
 > The dev container (`.devcontainer/`) ships all of the above preinstalled (and, being a

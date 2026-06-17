@@ -5,8 +5,7 @@ Pick a path and let the agents drive:
 
 - **Greenfield** - start from a product idea → PRD → FRD → tests → contracts → implement → deploy.
 - **Brownfield** - reverse-engineer existing code → extract → spec-enable → testability gate →
-  green baseline / behavioral docs → deliver. (This very repo was produced via the brownfield idea;
-  see [`docs/analysis/`](docs/analysis/).)
+  green baseline / behavioral docs → deliver. (This very repo was produced via the brownfield idea.)
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F2FA','primaryTextColor':'#323130','primaryBorderColor':'#0078D4','secondaryColor':'#E6F2FA','secondaryTextColor':'#323130','secondaryBorderColor':'#0078D4','tertiaryColor':'#E6F2FA','tertiaryTextColor':'#323130','tertiaryBorderColor':'#0078D4','clusterBkg':'#E6F2FA','clusterBorder':'#0078D4','titleColor':'#323130','textColor':'#323130','edgeLabelBackground':'#ffffff','lineColor':'#005A9E','fontFamily':'Segoe UI'}}}%%
@@ -65,6 +64,7 @@ and `.github/skills/resume`.
 ## Make it yours
 
 1. Rename the project: `azure.yaml` `name:`, `SPEC2CLOUD.md` metadata, this README, `LICENSE.md`.
-2. Fill placeholders (see [`docs/analysis/08-placeholders.md`](docs/analysis/08-placeholders.md)).
+2. Fill placeholders: search the repo for `agentic-blueprint` / example routes / the `_generate`
+   stub and replace them with your domain.
 3. Replace the example routes / graph node / landing page with your domain.
 4. Wire the production checklist in [`AGENTS.md`](AGENTS.md) (auth, RBAC, validation, telemetry, tests).

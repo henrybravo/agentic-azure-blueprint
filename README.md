@@ -4,6 +4,10 @@
 orchestrator, three Azure Container Apps wired by .NET Aspire, deployed with `azd`, and driven by
 the [spec2cloud](https://github.com/EmeaAppGbb/spec2cloud) spec-driven-development (SDD) workflow.
 
+> **Doing this in a hackathon?** Start with **[`HACKATHON.md`](HACKATHON.md)** — a one-page,
+> two-day runbook (Day 1 deploy infra → Day 2 build the app) with a pre-flight checklist and a
+> troubleshooting table for the failures teams actually hit.
+
 ## What's in the box
 
 | Area | What you get |
@@ -95,6 +99,18 @@ cd src/agentic-ui   && npm install && npm run dev    # http://localhost:3000
 azd auth login
 azd up   # provisions infra (infra/) and deploys all three services (azure.yaml)
 ```
+
+> **⚠️ Expected behavior — the deployed app does not call a real model out of the box.** Two
+> things surprise first-time deployers on this branch:
+> 1. **Cloud:** model egress is **fail-closed**. The deployed orchestrator has **no** direct access
+>    to the AI account; access is granted only when you enable the APIM AI Gateway
+>    (`AZURE_DEPLOY_APIM=true`, **off by default** — see [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) §B.2).
+>    Until then, a deployed turn returns the built-in **offline echo stub**, not a model completion.
+> 2. **Local:** `src/orchestrator/graph.py` `_generate` is an **offline echo stub** too, so the app
+>    runs end-to-end with no AI endpoint. Wiring a real model is a deliberate step, not a default.
+>
+> This is by design (guardrails are inescapable), not a bug. To get real completions, enable APIM
+> (cloud) or wire `_generate` to a deployment via managed identity (local) — see the LLD §5.
 
 See [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) for
 subscription prerequisites (RBAC, resource providers, model quota, region), and
