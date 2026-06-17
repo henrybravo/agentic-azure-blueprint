@@ -40,6 +40,15 @@ resources:
     type: host.containerapp
     port: 8000
 hooks:
+  preprovision:
+    posix:
+      shell: sh
+      run: ./infra/scripts/preprovision.sh
+      continueOnError: false
+    windows:
+      shell: pwsh
+      run: ./infra/scripts/preprovision.ps1
+      continueOnError: false
   postprovision:
     posix:
       shell: sh

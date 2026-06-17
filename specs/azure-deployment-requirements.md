@@ -53,6 +53,9 @@ when `principalType == User`.
 | `Microsoft.Portal` | provisioned dashboard |
 
 Register any that are not yet registered, e.g. `az provider register --namespace Microsoft.App`.
+**`Microsoft.AlertsManagement` is auto-registered** by the `preprovision` hook
+(`infra/scripts/preprovision.*`) because azd does not reliably pre-register it for the nested
+monitoring module; the others are registered by azd or should be pre-registered as above.
 
 For this customer's **target deployment**, also register **`Microsoft.DocumentDB`** (Cosmos DB
 durable state) and **`Microsoft.ApiManagement`** (AI gateway) - see B.1 / B.2.
