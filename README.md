@@ -70,7 +70,7 @@ flowchart TD
 - **Optional conveniences** (neither is required):
   - The [Dev Container](https://containers.dev/) (`.devcontainer/`) preinstalls everything below.
     Without it, install the tools yourself locally.
-  - **.NET Aspire** (`apphost.cs`, needs .NET SDK 9) runs all three services + a dashboard with one
+  - **.NET Aspire** (`apphost.cs`, needs .NET SDK 10) runs all three services + a dashboard with one
     command. You can skip Aspire entirely and run each service standalone instead (see below).
 
 > **Docker is not required to deploy** - `azure.yaml` sets `remoteBuild: true`, so container images
@@ -133,6 +133,57 @@ streaming chat round-trip (browser → UI → BFF → orchestrator), that the in
 reachable from the internet, and that the Foundry model deployment plus its env vars are wired into
 the orchestrator. It exits non-zero on any failure, so an agent or CI can gate on it. Requires the
 `az` CLI (logged in) and `curl`.
+
+## Build the app with Spec2Cloud (SDD)
+
+After the initial deploy, you build the **real** application with the spec-driven workflow
+(PRD → FRD → plan → implement → deploy). *This can run on a plain Windows workstation - **no
+devcontainer required**, because every spec2cloud agent primitive (agents, prompts, skills, instructions) is
+already committed and read natively by your github copilot agent harness.*
+
+**1. Pick an agent harness** (one of):
+
+- **GitHub Copilot CLI** - `npm install -g @github/copilot` (Node 22+), run `copilot`, then `/login`.
+  See [Installing Copilot CLI](https://docs.github.com/copilot/how-tos/set-up/install-copilot-cli).
+  This is what the `apm run …` scripts call under the hood.
+- **VS Code + GitHub Copilot** - open the repo; the `.github/` agents/prompts/skills load natively
+  (and wire the agents' MCP tools automatically).
+
+**2. Install the stack toolchain** (for the implement/test/deploy loop):
+
+- **Python 3.11+ and [`uv`](https://docs.astral.sh/uv/)** (for `agentic-api` + `orchestrator`)
+- **Node 20+ and npm** - `agentic-ui` (Next.js, Playwright/Vitest)
+- **`az` + `azd`** - per-increment deploy (already installed for the deploy above)
+- _Optional:_ **.NET SDK 10** - only for `dotnet run apphost.cs` (Aspire local run)
+
+> Docker is **not** required (host-process local run; ACR remote build).
+
+**2b. (Optional) Wire the agent MCP tools.** The agents use MCP servers for grounding/research
+(Microsoft Learn, Context7, DeepWiki), Azure ops (Azure MCP), GitHub issues, and Playwright. The repo
+ships [`.vscode/mcp.json`](.vscode/mcp.json) - open the repo in VS Code and Copilot offers to start
+the servers. **No GitHub PAT is needed:** the `github` server uses the **remote GitHub MCP endpoint
+authenticated via your VS Code Copilot/GitHub sign-in** (OAuth). The `npx`-based servers need **Node**
+and **network egress** to the npm registry, `learn.microsoft.com`, `mcp.deepwiki.com`, and Context7;
+the `aspire` server needs the Aspire CLI. **All MCP tools are optional** - if one is unavailable the
+agents fall back to built-in knowledge + `fetch`, and the PRD → … → deploy loop still runs.
+
+**3. Run the SDD pipeline.**
+Run each phase with whichever harness you picked in step 1:
+
+- **GitHub Copilot CLI:**
+  ```powershell
+  copilot --allow-tool -p .github/prompts/prd.prompt.md   # then: frd, plan, implement, deploy
+  ```
+- **VS Code + Copilot:** open the Copilot **Chat** view and run the prompt as a slash command -
+  type `/prd` (then `/frd`, `/plan`, `/implement`, `/deploy`). Workspace prompt files in
+  `.github/prompts/` are auto-discovered; each one's `agent:` front-matter selects the right agent.
+
+No `apm` install is needed - the prompts are already in the repo. (`apm` is the
+[Agent Package Manager](https://github.com/microsoft/apm); `apm run prd` is just an optional alias
+for the CLI command above. See [`Spec2Cloud-about.md`](Spec2Cloud-about.md) for the SDD workflow.)
+
+State stays resumable in [`.spec2cloud/state.json`](.spec2cloud/state.json) (+ `audit.log`)
+regardless of harness. See [`Spec2Cloud-about.md`](Spec2Cloud-about.md) for the full workflow.
 
 ## Author
 
