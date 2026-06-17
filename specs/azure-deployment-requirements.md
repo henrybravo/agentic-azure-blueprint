@@ -25,9 +25,8 @@
 
 `infra/main.bicep` is **subscription-scoped**: it creates the resource group *and* creates
 **role assignments** (`ai-project.bicep` grants the deployer Azure AI Developer + Cognitive
-Services User; `resources.bicep` grants each app's system-assigned identity AcrPull and the
-orchestrator Cognitive Services OpenAI User). Creating role assignments requires
-`Microsoft.Authorization/roleAssignments/write`.
+Services User; `resources.bicep` grants each app's system-assigned identity AcrPull). Creating
+role assignments requires `Microsoft.Authorization/roleAssignments/write`.
 
 **Minimum required, at subscription scope:**
 
@@ -65,8 +64,9 @@ From the verified provision run, the base shell creates:
   a **Foundry project**, and one **model deployment**.
 - **Container Registry** (**Basic**, admin user disabled - pull via managed identity).
 - **Container Apps Environment** + **3 container apps** (ui external; api + orchestrator internal).
-- **System-assigned managed identity** (one per app; each granted AcrPull, the orchestrator also
-  granted Cognitive Services OpenAI User on the AI account for model access).
+- **System-assigned managed identity** (one per app; each granted AcrPull). Model access is **not**
+  granted to the apps directly - it goes through the mandatory APIM AI Gateway (B.2), whose own
+  system-assigned identity holds the Cognitive Services role on the AI account.
 - **Log Analytics workspace**, **Application Insights**, **Portal dashboard**.
 
 > **Identity model (this branch).** The apps use **system-assigned** managed identity (one per
@@ -75,8 +75,10 @@ From the verified provision run, the base shell creates:
 > Functionally equivalent - Foundry auth, ACR pull, and `DefaultAzureCredential` all work. Trade-offs:
 > one identity per app (no shared identity), RBAC is assigned **after** each app exists (the first
 > deploy runs the public placeholder image, so no ACR pull is needed before the role lands), and the
-> identity is deleted with its app. For a shared identity or pre-provisioned RBAC, use the
-> user-assigned variant on `main`.
+> identity is deleted with its app. **Model egress is fail-closed:** the deployed apps get no direct
+> data-plane access to the AI account; enabling APIM (B.2) grants APIM's system-assigned identity the
+> account role - that is the required, visible step that turns on model access. For a shared identity
+> or pre-provisioned RBAC, use the user-assigned variant on `main`.
 
 Networking and access controls:
 
@@ -181,6 +183,18 @@ The base shell runs without them, and **B** includes durable state and the AI ga
   `AZURE_DEPLOY_APIM=true` for the target deployment.
 - For the content-safety policy, APIM's identity needs **Cognitive Services User** on a
   **Content Safety** resource.
+
+> **Required when enabling APIM (do not skip - this is what turns on model access).** On this
+> system-assigned branch the deployed apps have **no** direct data-plane access to the AI account by
+> design. Enabling the gateway is the single, explicit step that wires model egress, so the APIM
+> increment **must**:
+> 1. Grant **APIM's system-assigned identity** `Cognitive Services OpenAI User` (model) and
+>    `Cognitive Services User` (content safety) on the AI / Content Safety accounts.
+> 2. Point `AZURE_OPENAI_ENDPOINT` at the **APIM gateway URL**, not the raw account (lld §5).
+> 3. Keep the apps' identities free of any direct account role - all model traffic flows through APIM.
+>
+> Track this as a first-class task in the increment plan; without it, `deployApim=true` provisions
+> the gateway but no model calls succeed.
 
 ## C. Local development - run it on a laptop (no Azure, no Docker)
 

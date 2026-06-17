@@ -107,11 +107,13 @@ low-level design of the LangGraph-on-Foundry orchestrator.
 > regulated/FSI tenants). It is functionally equivalent - Foundry auth, ACR image pull, and
 > `DefaultAzureCredential` all work, with no `AZURE_CLIENT_ID` needed. **Trade-offs:** one identity
 > per app (no shared identity), RBAC is assigned after each app exists, and the identity is deleted
-> with its app. The orchestrator's identity is granted **Cognitive Services OpenAI User** so it can
-> call the model once you replace the stubbed `_generate` in `src/orchestrator/graph.py`. For a
+> with its app. **Model access is via the mandatory APIM AI Gateway** (`deployApim`, off by default):
+> APIM's own system-assigned identity holds the Cognitive Services role on the AI account, so the
+> deployed apps are **not** granted direct model access by design - until APIM is enabled, the
+> deployed orchestrator has no model egress (local dev calls the model as your own identity). For a
 > shared identity or pre-provisioned RBAC, use the user-assigned variant on `main`. See
-> [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) (Identity model)
-> and [`specs/lld-langgraph-foundry-agent.md`](specs/lld-langgraph-foundry-agent.md) (§6).
+> [`specs/azure-deployment-requirements.md`](specs/azure-deployment-requirements.md) (Identity model,
+> B.2) and [`specs/lld-langgraph-foundry-agent.md`](specs/lld-langgraph-foundry-agent.md) (§5/§6).
 
 ### Deploy with GitHub Copilot (recommended)
 

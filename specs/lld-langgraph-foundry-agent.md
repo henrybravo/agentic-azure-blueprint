@@ -211,10 +211,12 @@ guardrails (§12) are inescapable.
 ## 6. Capability 2 - Agent identity
 
 **Target design (this branch).** Each container authenticates with its own **system-assigned
-managed identity** (`infra/resources.bicep`, `managedIdentities.systemAssigned`). The
-orchestrator's identity is granted **Cognitive Services OpenAI User** on the AI account (model
-access) and **AcrPull** on the registry; the BFF and UI identities are granted **AcrPull**.
-`DefaultAzureCredential` resolves the system-assigned identity at runtime - no `AZURE_CLIENT_ID`.
+managed identity** (`infra/resources.bicep`, `managedIdentities.systemAssigned`), granted
+**AcrPull** on the registry. `DefaultAzureCredential` resolves the system-assigned identity at
+runtime - no `AZURE_CLIENT_ID`. **Model access is not granted to the apps directly:** egress goes
+through the mandatory APIM AI Gateway (§5, §12), where **APIM's own system-assigned identity**
+holds **Cognitive Services User / Foundry User** on the model/project. This keeps the gateway
+guardrails inescapable - the deployed apps cannot reach the model without APIM.
 
 > **Why system-assigned here.** This branch targets tenants where Azure Policy blocks
 > `Microsoft.ManagedIdentity/userAssignedIdentities`. Trade-off vs. the user-assigned variant on
