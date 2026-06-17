@@ -1,0 +1,45 @@
+{
+  // VS Code MCP config for the spec2cloud agents (research/grounding + Azure ops).
+  // Open this repo in VS Code and Copilot will offer to start these servers.
+  // All are OPTIONAL: if a server/tool is unavailable, the agents fall back to
+  // built-in knowledge and the `fetch` tool — the SDD loop still runs.
+  "servers": {
+    // GitHub MCP — remote server, authenticated via your VS Code GitHub sign-in
+    // (the Copilot extension login). No Personal Access Token required.
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    // Microsoft Learn docs — remote HTTP, no auth. Needs egress to learn.microsoft.com.
+    "microsoft.docs.mcp": {
+      "type": "http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
+    // DeepWiki — remote HTTP, no auth. Needs egress to mcp.deepwiki.com.
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    // Azure MCP — local via npx; uses your `az login` / DefaultAzureCredential. Needs Node.
+    "azure": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
+    },
+    // Context7 — local via npx (library docs). Needs Node + egress to the npm registry.
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    // Playwright MCP — local via npx (used by e2e/test skills). Needs Node.
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    // Aspire MCP — local; requires the Aspire CLI (.NET) installed. Only used by the
+    // aspire/test-runner skills. Remove this entry if you are not using Aspire.
+    "aspire": {
+      "command": "aspire",
+      "args": ["agent", "mcp"]
+    }
+  }
+}
